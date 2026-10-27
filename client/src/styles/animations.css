@@ -1,0 +1,49 @@
+/* ==========================================================================
+   animations.css — keyframes and small motion utility classes.
+   Structural fade-in-on-scroll, floating hero cards, and skeleton shimmer
+   live in style.css next to the components they animate; this file holds
+   the smaller, reusable micro-interactions.
+   ========================================================================== */
+
+/* Button ripple effect, triggered by app.js adding a .ripple span on click */
+@keyframes ripple-effect {
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  transform: scale(0);
+  pointer-events: none;
+  animation: ripple-effect 0.6s ease-out;
+}
+
+/* Gentle attention pulse, e.g. for the notification badge */
+@keyframes attention-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.pulse-on-load {
+  animation: attention-pulse 0.6s ease-in-out 1;
+}
+
+/* Fade + rise, used for content that appears after an async action
+   (e.g. search results swapping in after the skeleton loader) */
+@keyframes fade-rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-rise-in {
+  animation: fade-rise-in 0.4s ease both;
+}
+
+/* Simple spin, used alongside Bootstrap's .spinner-border on submit buttons */
+@keyframes soft-spin {
+  to { transform: rotate(360deg); }
+}

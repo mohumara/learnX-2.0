@@ -1,0 +1,45 @@
+/* Additions for the React version. Everything else is shared with the original design. */
+
+.page-loader {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-nav .nav-link.active { color: var(--primary); }
+.navbar-nav .nav-link.active::after { width: 100%; }
+
+/* Hand-rolled dropdown (no Bootstrap JS): pin the menu under its button */
+.user-menu .dropdown-menu {
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  min-width: 180px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+}
+
+.user-menu .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  padding: 8px 12px;
+}
+
+.modal-backdrop.show { opacity: 0.45; }
+
+.form-success-banner {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--secondary-dark);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}

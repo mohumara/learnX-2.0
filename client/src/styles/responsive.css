@@ -1,0 +1,40 @@
+/* ==========================================================================
+   responsive.css — supplementary breakpoint tweaks for the app pages
+   (dashboards, tables, auth). Landing-page-specific responsive rules live
+   alongside their components in style.css; this file covers the app shell.
+   ========================================================================== */
+
+/* Tablet */
+@media (max-width: 991px) {
+  .stat-card { flex-direction: column; text-align: center; }
+  .dashboard-panel-header { flex-wrap: wrap; gap: 10px; }
+}
+
+/* Mobile */
+@media (max-width: 575px) {
+  .app-table thead { display: none; }
+
+  .app-table, .app-table tbody, .app-table tr, .app-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .app-table tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+    padding: 8px 12px;
+  }
+
+  .app-table td {
+    border-bottom: none;
+    padding: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .role-select-group { flex-direction: column; }
+  .toast-container { width: 92%; }
+  .app-toast { width: 100%; justify-content: center; }
+}
