@@ -1018,11 +1018,42 @@ select:focus-visible {
   font-weight: 600;
 }
 
-.notif-item { padding: 10px; border-radius: var(--radius-sm); }
+.notif-item { width: 100%; border: none; background: transparent; text-align: left; padding: 10px; border-radius: var(--radius-sm); font: inherit; cursor: pointer; }
 .notif-item.unread { background: rgba(37, 99, 235, 0.06); }
 .notif-item p { margin: 0 0 4px; font-size: 0.85rem; color: var(--text); }
 .notif-item span { font-size: 0.72rem; color: var(--text-muted); }
 .notif-empty { padding: 18px 10px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
+.notification-alert-queue {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2500;
+  width: min(440px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.notification-alert {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 20px 44px 20px 20px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+.notification-alert-icon { color: var(--primary); font-size: 1.25rem; padding-top: 2px; }
+.notification-alert-content { min-width: 0; }
+.notification-alert-content strong { display: block; margin-bottom: 4px; }
+.notification-alert-content p { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 14px; }
+.notification-alert .btn-close { position: absolute; top: 14px; right: 14px; }
 
 /* ---------- Toasts ---------- */
 .toast-container {
@@ -1396,6 +1427,11 @@ select:focus-visible {
 
 .request-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
+.chat-messages { min-height: 280px; max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.chat-message { align-self: flex-start; max-width: 78%; background: var(--bg-soft); border-radius: 12px 12px 12px 3px; padding: 10px 13px; font-size: 0.9rem; }
+.chat-message.mine { align-self: flex-end; background: var(--primary); color: var(--white); border-radius: 12px 12px 3px 12px; }
+.chat-message small { display: block; margin-top: 4px; opacity: 0.72; font-size: 0.72rem; }
+
 .accept-btn, .decline-btn {
   font-size: 0.8rem;
   font-weight: 600;
@@ -1425,7 +1461,7 @@ select:focus-visible {
 
 .status-pending { background: rgba(245, 158, 11, 0.12); color: #B45309; }
 .status-accepted, .status-approved { background: rgba(16, 185, 129, 0.12); color: var(--secondary-dark); }
-.status-declined, .status-rejected { background: rgba(235, 75, 60, 0.1); color: var(--accent); }
+.status-declined, .status-rejected, .status-cancelled { background: rgba(235, 75, 60, 0.1); color: var(--accent); }
 
 .role-pill {
   font-size: 0.72rem;

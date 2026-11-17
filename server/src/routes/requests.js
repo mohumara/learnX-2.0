@@ -3,6 +3,7 @@ import { db } from '../config/firebase.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../utils/httpError.js';
 import { str, oneOf } from '../utils/validate.js';
+import { createNotification } from '../services/notifications.js';
 
 const router = Router();
 const requests = () => db.collection('requests');
@@ -16,6 +17,7 @@ router.post('/', requireRole('learner'), async (req, res) => {
   const tutorId = str(req.body.tutorId, 'Tutor', { max: 128 });
   const subject = str(req.body.subject, 'Subject', { max: 60 });
   const message = str(req.body.message, 'Message', { min: 10, max: 500 });
+  const lessonType = oneOf(req.body.lessonType, 'Lesson type', ['online', 'in-person']);
 
   const hours = Number(req.body.hours);
   if (!Number.isFinite(hours) || hours < 0.5 || hours > 8 || (hours * 2) % 1 !== 0) {
@@ -29,6 +31,10 @@ router.post('/', requireRole('learner'), async (req, res) => {
   const tutor = tutorSnap.data();
   if (![...tutor.subjects, ...tutor.skills].includes(subject)) {
     throw new HttpError(400, 'This tutor does not teach that subject.');
+  }
+  const tutorLessonType = lessonType === 'in-person' ? 'home' : 'online';
+  if (!(tutor.lessonTypes || []).includes(tutorLessonType)) {
+    throw new HttpError(400, `This tutor does not offer ${lessonType} lessons.`);
   }
 
   // Block duplicates: one open request per learner, tutor and subject
@@ -47,6 +53,7 @@ router.post('/', requireRole('learner'), async (req, res) => {
     subject,
     message,
     hours,
+    lessonType,
     status: 'pending',
     paymentRef: null,
     paymentStatus: 'unpaid',
@@ -62,6 +69,14 @@ router.post('/', requireRole('learner'), async (req, res) => {
     createdAt: new Date().toISOString()
   };
   const ref = await requests().add(data);
+  await createNotification({
+    recipientId: tutorId,
+    type: 'new_request',
+    title: 'New lesson request',
+    message: `${req.user.name} sent a request for ${subject}.`,
+    requestId: ref.id,
+    link: '/tutor/dashboard'
+  });
   res.status(201).json({ request: { id: ref.id, ...data } });
 });
 
@@ -89,6 +104,14 @@ router.patch('/:id', requireRole('tutor', 'learner'), async (req, res) => {
     if (requestData.tutorId !== req.user.uid) throw new HttpError(403, 'Permission denied.');
     const status = oneOf(req.body.status, 'Status', ['accepted', 'declined']);
     await ref.update({ status });
+    await createNotification({
+      recipientId: requestData.learnerId,
+      type: `request_${status}`,
+      title: status === 'accepted' ? 'Lesson request accepted' : 'Lesson request declined',
+      message: `${requestData.tutorName} ${status === 'accepted' ? 'accepted' : 'declined'} your ${requestData.subject} request.`,
+      requestId: snap.id,
+      link: '/learner/dashboard'
+    });
     return res.json({ request: { id: snap.id, ...requestData, status } });
   }
 
@@ -108,7 +131,21 @@ router.patch('/:id', requireRole('tutor', 'learner'), async (req, res) => {
       updates.hours = hours;
     }
     if (req.body.subject !== undefined) {
-      updates.subject = str(req.body.subject, 'Subject', { max: 60 });
+      const subject = str(req.body.subject, 'Subject', { max: 60 });
+      const tutorSnap = await db.collection('tutors').doc(requestData.tutorId).get();
+      const tutor = tutorSnap.data();
+      if (!tutorSnap.exists || ![...(tutor.subjects || []), ...(tutor.skills || [])].includes(subject)) {
+        throw new HttpError(400, 'This tutor does not teach that subject.');
+      }
+      if (subject !== requestData.subject) {
+        const learnerRequests = await requests().where('learnerId', '==', req.user.uid).get();
+        const duplicate = learnerRequests.docs.some((doc) => {
+          const item = doc.data();
+          return doc.id !== snap.id && item.tutorId === requestData.tutorId && item.subject === subject && item.status === 'pending';
+        });
+        if (duplicate) throw new HttpError(409, 'You already have a pending request for this tutor and subject.');
+      }
+      updates.subject = subject;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -20,6 +20,7 @@ export default function TutorDashboard() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
 
   useEffect(() => {
     Promise.all([getMyTutorProfile(), getMyRequests()])
@@ -44,6 +45,22 @@ export default function TutorDashboard() {
   const incomplete = tutor && !tutor.subjects.length && !tutor.skills.length;
   const pending = requests.filter((r) => r.status === 'pending').length;
   const accepted = requests.filter((r) => r.status === 'accepted').length;
+  const paymentHistory = requests.filter((r) => r.grossAmount != null || (r.paymentStatus && r.paymentStatus !== 'unpaid'));
+  const availableForWithdrawal = paymentHistory
+    .filter((r) => r.status === 'completed')
+    .reduce((total, r) => total + Number(r.tutorEarning || 0), 0);
+
+  const handleWithdraw = () => {
+    if (availableForWithdrawal <= 0) {
+      return toast.info('You will be able to withdraw after a learner confirms a paid lesson.');
+    }
+    if (!window.confirm(`Simulate withdrawal of ${formatCurrency(availableForWithdrawal)}? No real funds will be transferred.`)) return;
+    setWithdrawing(true);
+    window.setTimeout(() => {
+      setWithdrawing(false);
+      toast.success(`Simulated withdrawal of ${formatCurrency(availableForWithdrawal)} submitted.`);
+    }, 500);
+  };
 
   return (
     <>
@@ -109,6 +126,36 @@ export default function TutorDashboard() {
                       ) : (
                         <StatusPill status={r.status} />
                       )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <h2><i className="bi bi-wallet2"></i> Payment History</h2>
+                  <button type="button" className="btn btn-primary-cta" disabled={withdrawing} onClick={handleWithdraw}>
+                    {withdrawing ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-cash-coin me-1"></i>}
+                    Withdraw
+                  </button>
+                </div>
+                <p className="text-muted small mb-3">
+                  Available to withdraw: <strong>{formatCurrency(availableForWithdrawal)}</strong>
+                </p>
+                {paymentHistory.length === 0 ? (
+                  <EmptyState icon="bi-receipt" title="No payment history yet" text="Earnings from paid lessons will appear here." />
+                ) : (
+                  paymentHistory.map((r) => (
+                    <div className="request-row" key={`payment-${r.id}`}>
+                      <div className="request-row-main">
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <strong>{r.learnerName}</strong>
+                          <span className="request-subject">{r.subject}</span>
+                        </div>
+                        <p>{r.hours} {r.hours === 1 ? 'hour' : 'hours'} lesson{r.tutorEarning != null ? ` · You earn ${formatCurrency(r.tutorEarning)}` : ''}</p>
+                        <span className="request-date">{formatDate(r.paidAt || r.createdAt)}</span>
+                      </div>
+                      <StatusPill status={r.status} label={r.status === 'paid' ? 'Payment received' : r.status === 'completed' ? 'Ready to withdraw' : r.paymentStatus || r.status} />
                     </div>
                   ))
                 )}

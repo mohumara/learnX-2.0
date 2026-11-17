@@ -12,6 +12,28 @@ const router = Router();
 const requests = () => db.collection('requests');
 const withId = (doc) => ({ id: doc.id, ...doc.data() });
 
+async function ensureConversation(requestId, requestData) {
+  const ref = db.collection('conversations').doc(requestId);
+  const snap = await ref.get();
+  if (snap.exists) return { id: snap.id, ...snap.data() };
+
+  const data = {
+    requestId,
+    learnerId: requestData.learnerId,
+    learnerName: requestData.learnerName,
+    tutorId: requestData.tutorId,
+    tutorName: requestData.tutorName,
+    participantIds: [requestData.learnerId, requestData.tutorId],
+    subject: requestData.subject,
+    lessonType: requestData.lessonType || 'in-person',
+    createdAt: new Date().toISOString(),
+    lastMessage: '',
+    lastMessageAt: null
+  };
+  await ref.set(data);
+  return { id: ref.id, ...data };
+}
+
 /**
  * Helper to process tutor payouts upon session confirmation (manual or auto).
  * Handles the ₦1,000 threshold and pendingPayout accumulation.
@@ -261,7 +283,8 @@ router.get('/verify/:reference', verifyToken, requireRole('learner'), async (req
       })();
     }
 
-    return res.json({ success: true, request: updatedRequest });
+    const conversation = await ensureConversation(reqDoc.id, updatedRequest);
+    return res.json({ success: true, request: updatedRequest, conversationId: conversation.id });
   } else {
     return res.json({
       success: false,
@@ -315,6 +338,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               paymentStatus: 'paid',
               paidAt
             });
+            await ensureConversation(doc.id, { ...rData, status: 'paid', paymentStatus: 'paid', paidAt });
 
             // Fire-and-forget notification
             (async () => {

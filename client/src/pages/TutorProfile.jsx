@@ -168,7 +168,7 @@ export default function TutorProfile() {
                 <div className="d-flex gap-4">
                   <div className="form-check">
                     <input className="form-check-input" type="checkbox" id="lessonHome" checked={form.lessonTypes.includes('home')} onChange={toggleLesson('home')} />
-                    <label className="form-check-label" htmlFor="lessonHome">Home lessons</label>
+                    <label className="form-check-label" htmlFor="lessonHome">In-person lessons</label>
                   </div>
                   <div className="form-check">
                     <input className="form-check-input" type="checkbox" id="lessonOnline" checked={form.lessonTypes.includes('online')} onChange={toggleLesson('online')} />

@@ -23,7 +23,9 @@ export default function PaymentVerify() {
 
     verifyPayment(reference)
       .then((res) => {
-        if (res.success) {
+        if (res.success && res.conversationId) {
+          navigate(`/chats/${res.conversationId}`, { replace: true });
+        } else if (res.success) {
           setSuccess(true);
         } else {
           setError(res.reason || 'Payment was not successful. Please try again.');

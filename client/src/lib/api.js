@@ -27,14 +27,22 @@ async function request(path, { method = 'GET', body, params, authenticated = tru
     : '';
 
   let res;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     res = await fetch(`${BASE}${path}${query ? `?${query}` : ''}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal
     });
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new ApiError('The server took too long to respond. Please try again.', 0);
+    }
     throw new ApiError('Cannot reach the server. Check your connection and try again.', 0);
+  } finally {
+    clearTimeout(timeout);
   }
 
   const data = await res.json().catch(() => ({}));

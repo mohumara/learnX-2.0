@@ -15,6 +15,8 @@ import TutorProfile from './pages/TutorProfile';
 import AdminDashboard from './pages/AdminDashboard';
 import PaymentVerify from './pages/PaymentVerify';
 import NotFound from './pages/NotFound';
+import Chats from './pages/Chats';
+import Chat from './pages/Chat';
 
 export default function App() {
   return (
@@ -32,6 +34,8 @@ export default function App() {
         <Route path="/learner/dashboard" element={<ProtectedRoute roles={['learner']}><LearnerDashboard /></ProtectedRoute>} />
         <Route path="/tutor/dashboard" element={<ProtectedRoute roles={['tutor']}><TutorDashboard /></ProtectedRoute>} />
         <Route path="/tutor/profile" element={<ProtectedRoute roles={['tutor']}><TutorProfile /></ProtectedRoute>} />
+        <Route path="/chats" element={<ProtectedRoute roles={['learner', 'tutor']}><Chats /></ProtectedRoute>} />
+        <Route path="/chats/:id" element={<ProtectedRoute roles={['learner', 'tutor']}><Chat /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
 
         <Route path="*" element={<NotFound />} />

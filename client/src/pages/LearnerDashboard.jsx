@@ -8,11 +8,12 @@ import StatusPill from '../components/StatusPill';
 import TutorCard from '../components/TutorCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { getMyRequests } from '../services/requests';
+import { cancelLessonRequest, getMyRequests, updateLessonRequest } from '../services/requests';
 import { getBookmarkedTutors, toggleBookmark } from '../services/bookmarks';
 import { initializePayment, confirmSession, disputeSession } from '../services/payments';
 import { formatDate, formatCurrency } from '../lib/format';
 import Modal from '../components/Modal';
+import { SKILLS, SUBJECTS } from '../constants';
 
 export default function LearnerDashboard() {
   const { profile, updateName, setBookmarks } = useAuth();
@@ -27,6 +28,9 @@ export default function LearnerDashboard() {
   const [confirmingId, setConfirmingId] = useState(null);
   const [disputeModal, setDisputeModal] = useState({ open: false, requestId: null, reason: '' });
   const [disputing, setDisputing] = useState(false);
+  const [editModal, setEditModal] = useState({ open: false, requestId: null, subject: '', message: '', hours: 1 });
+  const [savingRequest, setSavingRequest] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => {
     Promise.all([getMyRequests(), getBookmarkedTutors()])
@@ -112,7 +116,58 @@ export default function LearnerDashboard() {
     }
   };
 
+  const openEditRequest = (request) => {
+    setEditModal({
+      open: true,
+      requestId: request.id,
+      subject: request.subject,
+      message: request.message,
+      hours: request.hours
+    });
+  };
+
+  const closeEditRequest = () => {
+    setEditModal({ open: false, requestId: null, subject: '', message: '', hours: 1 });
+  };
+
+  const handleEditRequest = async (e) => {
+    e.preventDefault();
+    if (editModal.message.trim().length < 10) {
+      return toast.error('Please add a message of at least 10 characters.');
+    }
+    setSavingRequest(true);
+    try {
+      const { request } = await updateLessonRequest(editModal.requestId, {
+        subject: editModal.subject,
+        message: editModal.message.trim(),
+        hours: Number(editModal.hours)
+      });
+      setRequests((prev) => prev.map((item) => (item.id === request.id ? request : item)));
+      closeEditRequest();
+      toast.success('Lesson request updated.');
+    } catch (err) {
+      toast.error(err.message || 'Could not update the lesson request.');
+    } finally {
+      setSavingRequest(false);
+    }
+  };
+
+  const handleCancelRequest = async (requestId) => {
+    if (!window.confirm('Cancel this lesson request? Your tutor will no longer be able to accept it.')) return;
+    setCancellingId(requestId);
+    try {
+      await cancelLessonRequest(requestId);
+      setRequests((prev) => prev.map((item) => (item.id === requestId ? { ...item, status: 'cancelled' } : item)));
+      toast.success('Lesson request cancelled.');
+    } catch (err) {
+      toast.error(err.message || 'Could not cancel the lesson request.');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   const accepted = requests.filter((r) => r.status === 'accepted').length;
+  const paymentHistory = requests.filter((r) => r.grossAmount != null || (r.paymentStatus && r.paymentStatus !== 'unpaid'));
 
   return (
     <>
@@ -163,6 +218,23 @@ export default function LearnerDashboard() {
 
                       <div className="d-flex flex-column align-items-end gap-2">
                         <StatusPill status={r.status} />
+
+                        {r.status === 'pending' && (
+                          <div className="request-actions">
+                            <button type="button" className="btn accept-btn" onClick={() => openEditRequest(r)}>
+                              <i className="bi bi-pencil"></i> Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn decline-btn"
+                              disabled={cancellingId === r.id}
+                              onClick={() => handleCancelRequest(r.id)}
+                            >
+                              {cancellingId === r.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-x-lg"></i>}
+                              Cancel
+                            </button>
+                          </div>
+                        )}
 
                         {r.status === 'accepted' && (
                           <button
@@ -216,6 +288,29 @@ export default function LearnerDashboard() {
                           </button>
                         )}
                       </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <h2><i className="bi bi-credit-card"></i> Payment History</h2>
+                </div>
+                {paymentHistory.length === 0 ? (
+                  <EmptyState icon="bi-receipt" title="No payment history yet" text="Payments for accepted lessons will appear here." />
+                ) : (
+                  paymentHistory.map((r) => (
+                    <div className="request-row" key={`payment-${r.id}`}>
+                      <div className="request-row-main">
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <strong>{r.tutorName}</strong>
+                          <span className="request-subject">{r.subject}</span>
+                        </div>
+                        <p>{r.hours} {r.hours === 1 ? 'hour' : 'hours'} lesson{r.grossAmount != null ? ` · ${formatCurrency(r.grossAmount)}` : ''}</p>
+                        <span className="request-date">{formatDate(r.paidAt || r.createdAt)}</span>
+                      </div>
+                      <StatusPill status={r.status} label={r.status === 'paid' ? 'Paid' : r.status === 'completed' ? 'Completed' : r.paymentStatus || r.status} />
                     </div>
                   ))
                 )}
@@ -290,6 +385,57 @@ export default function LearnerDashboard() {
               <button type="submit" className="btn btn-danger" disabled={disputing}>
                 {disputing ? <span className="spinner-border spinner-border-sm me-1"></span> : null}
                 Submit Dispute
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {editModal.open && (
+        <Modal title="Edit lesson request" onClose={closeEditRequest}>
+          <form onSubmit={handleEditRequest}>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label" htmlFor="editRequestSubject">Subject or skill</label>
+                <select
+                  id="editRequestSubject"
+                  className="form-select"
+                  value={editModal.subject}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, subject: e.target.value }))}
+                >
+                  {[...SUBJECTS, ...SKILLS].map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="editRequestHours">Lesson duration</label>
+                <select
+                  id="editRequestHours"
+                  className="form-select"
+                  value={editModal.hours}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, hours: e.target.value }))}
+                >
+                  {[0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8].map((hours) => <option key={hours} value={hours}>{hours} {hours === 1 ? 'hour' : 'hours'}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="editRequestMessage">Message</label>
+                <textarea
+                  id="editRequestMessage"
+                  rows="4"
+                  className="form-control"
+                  value={editModal.message}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, message: e.target.value }))}
+                  minLength="10"
+                  maxLength="500"
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary-cta" onClick={closeEditRequest}>Cancel</button>
+              <button type="submit" className="btn btn-primary-cta" disabled={savingRequest}>
+                {savingRequest && <span className="spinner-border spinner-border-sm me-1"></span>}
+                Save Changes
               </button>
             </div>
           </form>

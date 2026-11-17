@@ -3,6 +3,7 @@ import { capitalize } from '../lib/format';
 const ICONS = {
   approved: 'bi-patch-check-fill',
   pending: 'bi-hourglass-split',
+  cancelled: 'bi-x-circle',
   rejected: 'bi-x-circle'
 };
 

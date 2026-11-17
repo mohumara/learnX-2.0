@@ -20,7 +20,7 @@ export default function TutorDetails() {
   const [tutor, setTutor] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | missing
   const [modalOpen, setModalOpen] = useState(false);
-  const [request, setRequest] = useState({ subject: '', message: '', hours: 1 });
+  const [request, setRequest] = useState({ subject: '', message: '', hours: 1, lessonType: '' });
   const [requestError, setRequestError] = useState('');
   const [sending, setSending] = useState(false);
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
@@ -30,7 +30,12 @@ export default function TutorDetails() {
     getTutor(id)
       .then(({ tutor }) => {
         setTutor(tutor);
-        setRequest({ subject: [...tutor.subjects, ...tutor.skills][0] || '', message: '', hours: 1 });
+        setRequest({
+          subject: [...tutor.subjects, ...tutor.skills][0] || '',
+          message: '',
+          hours: 1,
+          lessonType: tutor.lessonTypes.includes('online') ? 'online' : 'in-person'
+        });
         setStatus('ready');
       })
       .catch(() => setStatus('missing'));
@@ -50,6 +55,10 @@ export default function TutorDetails() {
   const isLearner = profile?.role === 'learner';
   const bookmarked = profile?.bookmarks?.includes(tutor.id);
   const teaches = [...tutor.subjects, ...tutor.skills];
+  const lessonOptions = [
+    tutor.lessonTypes.includes('online') && { value: 'online', label: 'Online' },
+    tutor.lessonTypes.includes('home') && { value: 'in-person', label: 'In-person' }
+  ].filter(Boolean);
 
   const handleBookmark = async () => {
     try {
@@ -73,7 +82,8 @@ export default function TutorDetails() {
         tutorId: tutor.id,
         subject: request.subject,
         message: request.message.trim(),
-        hours: Number(request.hours)
+        hours: Number(request.hours),
+        lessonType: request.lessonType
       });
       setModalOpen(false);
       setRequest((r) => ({ ...r, message: '', hours: 1 }));
@@ -142,7 +152,7 @@ export default function TutorDetails() {
             <div className="tutor-detail-section">
               <h4>Lesson Type</h4>
               <div className="tutor-tags">
-                {tutor.lessonTypes.includes('home') && <span className="lesson-pill home"><i className="bi bi-house-door"></i> Home Lessons</span>}
+                {tutor.lessonTypes.includes('home') && <span className="lesson-pill home"><i className="bi bi-person"></i> In-person Lessons</span>}
                 {tutor.lessonTypes.includes('online') && <span className="lesson-pill online"><i className="bi bi-camera-video"></i> Online Lessons</span>}
               </div>
             </div>
@@ -184,6 +194,17 @@ export default function TutorDetails() {
                 <div className="form-text mt-1">
                   Estimated Total: <strong>{formatCurrency(request.hours * (tutor?.hourlyRate || 0))}</strong> ({formatCurrency(tutor?.hourlyRate || 0)}/hr)
                 </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="reqLessonType">Lesson format</label>
+                <select
+                  id="reqLessonType"
+                  className="form-select"
+                  value={request.lessonType}
+                  onChange={(e) => setRequest((r) => ({ ...r, lessonType: e.target.value }))}
+                >
+                  {lessonOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
               </div>
               <div className="mb-3">
                 <label className="form-label" htmlFor="reqMessage">Message</label>
