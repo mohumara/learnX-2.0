@@ -17,6 +17,11 @@ router.post('/', requireRole('learner'), async (req, res) => {
   const subject = str(req.body.subject, 'Subject', { max: 60 });
   const message = str(req.body.message, 'Message', { min: 10, max: 500 });
 
+  const hours = Number(req.body.hours);
+  if (!Number.isFinite(hours) || hours < 0.5 || hours > 8 || (hours * 2) % 1 !== 0) {
+    throw new HttpError(400, 'Hours must be between 0.5 and 8 in 0.5 increments.');
+  }
+
   const tutorSnap = await db.collection('tutors').doc(tutorId).get();
   if (!tutorSnap.exists || tutorSnap.data().status !== 'approved') {
     throw new HttpError(404, 'Tutor not found.');
@@ -41,7 +46,19 @@ router.post('/', requireRole('learner'), async (req, res) => {
     tutorName: tutor.name,
     subject,
     message,
+    hours,
     status: 'pending',
+    paymentRef: null,
+    paymentStatus: 'unpaid',
+    grossAmount: null,
+    platformFee: null,
+    tutorEarning: null,
+    paidAt: null,
+    confirmedAt: null,
+    autoConfirmed: false,
+    disputedAt: null,
+    disputeDeadline: null,
+    reviewId: null,
     createdAt: new Date().toISOString()
   };
   const ref = await requests().add(data);
@@ -55,17 +72,72 @@ router.get('/mine', requireRole('learner', 'tutor'), async (req, res) => {
   res.json({ requests: snap.docs.map(withId).sort(newestFirst) });
 });
 
-// PATCH /api/requests/:id  (tutor accepts or declines a pending request)
-router.patch('/:id', requireRole('tutor'), async (req, res) => {
-  const status = oneOf(req.body.status, 'Status', ['accepted', 'declined']);
-
+// PATCH /api/requests/:id  (tutor accepts or declines, or learner edits a pending request)
+// confirm and dispute endpoints live in routes/payments.js
+router.patch('/:id', requireRole('tutor', 'learner'), async (req, res) => {
   const ref = requests().doc(req.params.id);
   const snap = await ref.get();
-  if (!snap.exists || snap.data().tutorId !== req.user.uid) throw new HttpError(404, 'Request not found.');
-  if (snap.data().status !== 'pending') throw new HttpError(409, 'This request has already been answered.');
+  if (!snap.exists) throw new HttpError(404, 'Request not found.');
+  const requestData = snap.data();
 
-  await ref.update({ status });
-  res.json({ request: { id: snap.id, ...snap.data(), status } });
+  if (requestData.status !== 'pending') {
+    throw new HttpError(409, 'Only pending requests can be modified.');
+  }
+
+  // Tutor flow: accept or decline
+  if (req.user.role === 'tutor') {
+    if (requestData.tutorId !== req.user.uid) throw new HttpError(403, 'Permission denied.');
+    const status = oneOf(req.body.status, 'Status', ['accepted', 'declined']);
+    await ref.update({ status });
+    return res.json({ request: { id: snap.id, ...requestData, status } });
+  }
+
+  // Learner flow: edit message, subject, or hours
+  if (req.user.role === 'learner') {
+    if (requestData.learnerId !== req.user.uid) throw new HttpError(403, 'Permission denied.');
+
+    const updates = {};
+    if (req.body.message !== undefined) {
+      updates.message = str(req.body.message, 'Message', { min: 10, max: 500 });
+    }
+    if (req.body.hours !== undefined) {
+      const hours = Number(req.body.hours);
+      if (!Number.isFinite(hours) || hours < 0.5 || hours > 8 || (hours * 2) % 1 !== 0) {
+        throw new HttpError(400, 'Hours must be between 0.5 and 8 in 0.5 increments.');
+      }
+      updates.hours = hours;
+    }
+    if (req.body.subject !== undefined) {
+      updates.subject = str(req.body.subject, 'Subject', { max: 60 });
+    }
+
+    if (Object.keys(updates).length === 0) {
+      throw new HttpError(400, 'No fields to update provided.');
+    }
+
+    await ref.update(updates);
+    const updatedSnap = await ref.get();
+    return res.json({ request: { id: updatedSnap.id, ...updatedSnap.data() } });
+  }
+});
+
+// DELETE /api/requests/:id  (learner cancels a pending request)
+router.delete('/:id', requireRole('learner'), async (req, res) => {
+  const ref = requests().doc(req.params.id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpError(404, 'Request not found.');
+  const requestData = snap.data();
+
+  if (requestData.learnerId !== req.user.uid) {
+    throw new HttpError(403, 'You do not have permission to cancel this request.');
+  }
+
+  if (requestData.status !== 'pending') {
+    throw new HttpError(400, 'Only pending requests can be cancelled.');
+  }
+
+  await ref.update({ status: 'cancelled' });
+  res.json({ success: true, message: 'Request cancelled successfully.' });
 });
 
 export default router;

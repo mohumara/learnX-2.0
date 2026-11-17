@@ -13,6 +13,7 @@ import LearnerDashboard from './pages/LearnerDashboard';
 import TutorDashboard from './pages/TutorDashboard';
 import TutorProfile from './pages/TutorProfile';
 import AdminDashboard from './pages/AdminDashboard';
+import PaymentVerify from './pages/PaymentVerify';
 import NotFound from './pages/NotFound';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/search" element={<Search />} />
         <Route path="/tutors/:id" element={<TutorDetails />} />
+        <Route path="/payment/verify" element={<ProtectedRoute roles={['learner']}><PaymentVerify /></ProtectedRoute>} />
 
         <Route path="/learner/dashboard" element={<ProtectedRoute roles={['learner']}><LearnerDashboard /></ProtectedRoute>} />
         <Route path="/tutor/dashboard" element={<ProtectedRoute roles={['tutor']}><TutorDashboard /></ProtectedRoute>} />

@@ -3,6 +3,7 @@ import { auth, db } from '../config/firebase.js';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../utils/httpError.js';
 import { oneOf } from '../utils/validate.js';
+import * as notify from '../services/notify.js';
 
 const router = Router();
 router.use(verifyToken, requireRole('admin'));
@@ -11,13 +12,15 @@ const count = async (query) => (await query.count().get()).data().count;
 
 // GET /api/admin/stats
 router.get('/stats', async (req, res) => {
-  const [totalUsers, totalTutors, pendingTutors, totalRequests] = await Promise.all([
+  // TODO: totalRevenue calculation (requires aggregating platformFee from paid/completed requests)
+  const [totalUsers, totalTutors, pendingTutors, totalRequests, pendingDisputes] = await Promise.all([
     count(db.collection('users')),
     count(db.collection('tutors')),
     count(db.collection('tutors').where('status', '==', 'pending')),
-    count(db.collection('requests'))
+    count(db.collection('requests')),
+    count(db.collection('requests').where('status', '==', 'disputed'))
   ]);
-  res.json({ totalUsers, totalTutors, pendingTutors, totalRequests });
+  res.json({ totalUsers, totalTutors, pendingTutors, totalRequests, pendingDisputes });
 });
 
 // GET /api/admin/users
@@ -38,9 +41,30 @@ router.get('/tutors', async (req, res) => {
 // PATCH /api/admin/tutors/:id/status  (approve or reject)
 router.patch('/tutors/:id/status', async (req, res) => {
   const status = oneOf(req.body.status, 'Status', ['approved', 'rejected']);
-  const ref = db.collection('tutors').doc(req.params.id);
-  if (!(await ref.get()).exists) throw new HttpError(404, 'Tutor not found.');
-  await ref.update({ status });
+  const tutorRef = db.collection('tutors').doc(req.params.id);
+  const userRef = db.collection('users').doc(req.params.id);
+
+  const [tutorSnap, userSnap] = await Promise.all([
+    tutorRef.get(),
+    userRef.get()
+  ]);
+
+  if (!tutorSnap.exists) throw new HttpError(404, 'Tutor not found.');
+
+  const tutor = tutorSnap.data();
+  if (status === 'approved' && tutor.payoutSetupDone !== true) {
+    throw new HttpError(400, 'This tutor must set up bank details before they can be approved.');
+  }
+
+  await tutorRef.update({ status });
+
+  const tutorEmail = userSnap.exists ? userSnap.data().email : null;
+  const tutorName = tutor.name || (userSnap.exists ? userSnap.data().name : '');
+
+  notify.tutorStatusChanged({ tutorId: req.params.id, status, tutorEmail, tutorName }).catch((err) => {
+    console.error('[notify:tutorStatusChanged]', err.message);
+  });
+
   res.json({ id: req.params.id, status });
 });
 

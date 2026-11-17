@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getMyTutorProfile } from '../services/tutors';
 import { getMyRequests, respondToRequest } from '../services/requests';
-import { formatDate } from '../lib/format';
+import { formatDate, formatCurrency } from '../lib/format';
 
 const STATUS_LABELS = { approved: 'Verified', pending: 'Pending Review', rejected: 'Not Approved' };
 
@@ -69,10 +69,19 @@ export default function TutorDashboard() {
                 </div>
               )}
 
+              {!tutor.payoutSetupDone && (
+                <div className="form-error-banner mb-4" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#DC2626', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+                  <i className="bi bi-bank2"></i>
+                  <strong>Bank details required:</strong> You must configure your payout bank account before your profile can be approved by admins and receive payouts.
+                  <Link to="/tutor/profile" className="ms-auto fw-bold">Add bank details</Link>
+                </div>
+              )}
+
               <div className="row g-4 mb-4">
-                <div className="col-md-4"><StatCard icon="bi-star-fill" color="amber" value={tutor.rating ? tutor.rating.toFixed(1) : 'N/A'} label="Average Rating" /></div>
-                <div className="col-md-4"><StatCard icon="bi-hourglass-split" color="blue" value={pending} label="Pending Requests" /></div>
-                <div className="col-md-4"><StatCard icon="bi-check-circle-fill" color="green" value={accepted} label="Accepted Requests" /></div>
+                <div className="col-md-3"><StatCard icon="bi-star-fill" color="amber" value={tutor.rating ? tutor.rating.toFixed(1) : 'N/A'} label="Average Rating" /></div>
+                <div className="col-md-3"><StatCard icon="bi-hourglass-split" color="blue" value={pending} label="Pending Requests" /></div>
+                <div className="col-md-3"><StatCard icon="bi-check-circle-fill" color="green" value={accepted} label="Accepted Requests" /></div>
+                <div className="col-md-3"><StatCard icon="bi-wallet2" color="purple" value={formatCurrency(tutor.totalEarnings || 0)} label="Total Earnings" /></div>
               </div>
 
               <div className="dashboard-panel">
@@ -83,8 +92,12 @@ export default function TutorDashboard() {
                   requests.map((r) => (
                     <div className="request-row" key={r.id}>
                       <div className="request-row-main">
-                        <strong>{r.learnerName}</strong>
-                        <span className="request-subject">{r.subject}</span>
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <strong>{r.learnerName}</strong>
+                          <span className="request-subject">{r.subject}</span>
+                          {r.hours && <span className="badge bg-light text-dark border">{r.hours} {r.hours === 1 ? 'hr' : 'hrs'}</span>}
+                          {r.tutorEarning && <span className="badge bg-success-subtle text-success border">Earns {formatCurrency(r.tutorEarning)}</span>}
+                        </div>
                         <p>{r.message}</p>
                         <span className="request-date">{formatDate(r.createdAt)}</span>
                       </div>

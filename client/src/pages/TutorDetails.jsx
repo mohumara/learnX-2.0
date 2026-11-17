@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import Avatar from '../components/Avatar';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
@@ -14,21 +14,23 @@ import { formatCurrency } from '../lib/format';
 
 export default function TutorDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { profile, setBookmarks } = useAuth();
   const toast = useToast();
   const [tutor, setTutor] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | missing
   const [modalOpen, setModalOpen] = useState(false);
-  const [request, setRequest] = useState({ subject: '', message: '' });
+  const [request, setRequest] = useState({ subject: '', message: '', hours: 1 });
   const [requestError, setRequestError] = useState('');
   const [sending, setSending] = useState(false);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
 
   useEffect(() => {
     setStatus('loading');
     getTutor(id)
       .then(({ tutor }) => {
         setTutor(tutor);
-        setRequest({ subject: [...tutor.subjects, ...tutor.skills][0] || '', message: '' });
+        setRequest({ subject: [...tutor.subjects, ...tutor.skills][0] || '', message: '', hours: 1 });
         setStatus('ready');
       })
       .catch(() => setStatus('missing'));
@@ -67,11 +69,19 @@ export default function TutorDetails() {
     }
     setSending(true);
     try {
-      await sendLessonRequest({ tutorId: tutor.id, subject: request.subject, message: request.message.trim() });
-      toast.success('Lesson request sent!');
+      await sendLessonRequest({
+        tutorId: tutor.id,
+        subject: request.subject,
+        message: request.message.trim(),
+        hours: Number(request.hours)
+      });
       setModalOpen(false);
-      setRequest((r) => ({ ...r, message: '' }));
+      setRequest((r) => ({ ...r, message: '', hours: 1 }));
       setRequestError('');
+      setShowSuccessBanner(true);
+      setTimeout(() => {
+        navigate('/learner/dashboard');
+      }, 1500);
     } catch (err) {
       setRequestError(err.message);
     } finally {
@@ -158,6 +168,24 @@ export default function TutorDetails() {
                 </select>
               </div>
               <div className="mb-3">
+                <label className="form-label" htmlFor="reqHours">Estimated Hours</label>
+                <select
+                  id="reqHours"
+                  className="form-select"
+                  value={request.hours}
+                  onChange={(e) => setRequest((r) => ({ ...r, hours: parseFloat(e.target.value) }))}
+                >
+                  {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8].map((h) => (
+                    <option key={h} value={h}>
+                      {h} {h === 1 ? 'hour' : 'hours'}
+                    </option>
+                  ))}
+                </select>
+                <div className="form-text mt-1">
+                  Estimated Total: <strong>{formatCurrency(request.hours * (tutor?.hourlyRate || 0))}</strong> ({formatCurrency(tutor?.hourlyRate || 0)}/hr)
+                </div>
+              </div>
+              <div className="mb-3">
                 <label className="form-label" htmlFor="reqMessage">Message</label>
                 <textarea
                   id="reqMessage"
@@ -177,6 +205,57 @@ export default function TutorDetails() {
             </div>
           </form>
         </Modal>
+      )}
+      {showSuccessBanner && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              padding: '36px 44px',
+              maxWidth: '520px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              textAlign: 'center',
+              border: '1px solid rgba(16, 185, 129, 0.2)'
+            }}
+          >
+            <div
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                background: 'rgba(16, 185, 129, 0.12)',
+                color: '#10B981',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '2.5rem',
+                marginBottom: '18px'
+              }}
+            >
+              <i className="bi bi-check-circle-fill"></i>
+            </div>
+            <h3 style={{ fontWeight: 700, color: '#1F2937', marginBottom: '8px' }}>
+              Lesson Request Sent Successfully!
+            </h3>
+            <p style={{ color: '#6B7280', fontSize: '0.95rem', margin: 0 }}>
+              Your tutor will be notified. Taking you to your requests...
+            </p>
+          </div>
+        </div>
       )}
     </section>
   );

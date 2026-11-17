@@ -8,6 +8,8 @@ import requestRoutes from './routes/requests.js';
 import bookmarkRoutes from './routes/bookmarks.js';
 import adminRoutes from './routes/admin.js';
 import contactRoutes from './routes/contact.js';
+import paymentRoutes from './routes/payments.js';
+import bankRoutes from './routes/bank.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 
 const app = express();
@@ -29,6 +31,8 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/tutors', bankRoutes); // bank routes are under /api/tutors/me/bank
 
 app.use(notFound);
 app.use(errorHandler);

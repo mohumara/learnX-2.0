@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader';
 import PageLoader from '../components/PageLoader';
 import { useToast } from '../context/ToastContext';
 import { getMyTutorProfile, saveMyTutorProfile } from '../services/tutors';
+import { getBankDetails, saveBankDetails } from '../services/bank';
 import { DAYS, NIGERIAN_STATES, SKILLS, SUBJECTS } from '../constants';
 
 export default function TutorProfile() {
@@ -16,9 +17,14 @@ export default function TutorProfile() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Bank details state
+  const [bank, setBank] = useState({ bankCode: '', accountNumber: '', bankName: '', accountName: '', payoutSetupDone: false });
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankError, setBankError] = useState('');
+
   useEffect(() => {
-    getMyTutorProfile()
-      .then(({ tutor }) => {
+    Promise.all([getMyTutorProfile(), getBankDetails().catch(() => ({ bank: {} }))])
+      .then(([{ tutor }, bankRes]) => {
         setStatus(tutor.status);
         setForm({
           bio: tutor.bio,
@@ -30,6 +36,16 @@ export default function TutorProfile() {
           lessonTypes: tutor.lessonTypes,
           availability: tutor.availability
         });
+        const bankData = bankRes?.bank || bankRes;
+        if (bankData && (bankData.bankCode || bankData.payoutSetupDone)) {
+          setBank({
+            bankCode: bankData.bankCode || '',
+            accountNumber: bankData.accountNumber || '',
+            bankName: bankData.bankName || '',
+            accountName: bankData.accountName || '',
+            payoutSetupDone: Boolean(bankData.payoutSetupDone)
+          });
+        }
       })
       .catch((err) => setLoadError(err.message));
   }, []);
@@ -46,6 +62,40 @@ export default function TutorProfile() {
       ...f,
       lessonTypes: e.target.checked ? [...f.lessonTypes, type] : f.lessonTypes.filter((t) => t !== type)
     }));
+
+  const handleBankSubmit = async (e) => {
+    e.preventDefault();
+    if (bank.accountNumber.trim().length !== 10) {
+      setBankError('Account number must be 10 digits.');
+      return;
+    }
+    if (!bank.bankCode) {
+      setBankError('Please select your bank.');
+      return;
+    }
+    setSavingBank(true);
+    setBankError('');
+    try {
+      const res = await saveBankDetails({
+        bankCode: bank.bankCode,
+        accountNumber: bank.accountNumber.trim(),
+        bankName: bank.bankName
+      });
+      const bankData = res?.bank || res;
+      setBank({
+        bankCode: bankData.bankCode || '',
+        accountNumber: bankData.accountNumber || '',
+        bankName: bankData.bankName || '',
+        accountName: bankData.accountName || '',
+        payoutSetupDone: Boolean(bankData.payoutSetupDone)
+      });
+      toast.success(`Bank details verified for ${bankData.accountName || 'account'}!`);
+    } catch (err) {
+      setBankError(err.message || 'Failed to verify bank details.');
+    } finally {
+      setSavingBank(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -141,6 +191,98 @@ export default function TutorProfile() {
                 {saving ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-check-lg"></i>} Save Profile
               </button>
               <Link to="/tutor/dashboard" className="btn btn-secondary-cta ms-2">Back to Dashboard</Link>
+            </form>
+          </div>
+
+          <div className="dashboard-panel mt-4" style={{ maxWidth: 800, margin: '2rem auto 0' }}>
+            <div className="dashboard-panel-header">
+              <h2><i className="bi bi-bank2"></i> Payout Bank Details</h2>
+            </div>
+            <p className="text-muted small">
+              We pay your earnings directly to your verified Nigerian bank account. Required before admin approval.
+            </p>
+
+            {bank.payoutSetupDone ? (
+              <div className="alert alert-success d-flex align-items-center justify-content-between">
+                <div>
+                  <i className="bi bi-check-circle-fill me-2"></i>
+                  <strong>Verified:</strong> {bank.accountName} ({bank.bankName} - {bank.accountNumber})
+                </div>
+                <span className="badge bg-success">Active</span>
+              </div>
+            ) : (
+              <div className="alert alert-warning">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                You have not connected a verified bank account yet.
+              </div>
+            )}
+
+            {bankError && <div className="form-error-banner"><i className="bi bi-exclamation-triangle-fill"></i> {bankError}</div>}
+
+            <form onSubmit={handleBankSubmit}>
+              <div className="row g-3 mb-3">
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="bankSelect">Bank</label>
+                  <select
+                    id="bankSelect"
+                    className="form-select"
+                    value={bank.bankCode}
+                    onChange={(e) => {
+                      const selected = e.target.options[e.target.selectedIndex];
+                      setBank((prev) => ({
+                        ...prev,
+                        bankCode: e.target.value,
+                        bankName: selected.text
+                      }));
+                    }}
+                    required
+                  >
+                    <option value="">Select your bank</option>
+                    <option value="044">Access Bank</option>
+                    <option value="023">Citibank</option>
+                    <option value="050">Ecobank</option>
+                    <option value="070">Fidelity Bank</option>
+                    <option value="011">First Bank of Nigeria</option>
+                    <option value="214">First City Monument Bank (FCMB)</option>
+                    <option value="058">Guaranty Trust Bank (GTBank)</option>
+                    <option value="030">Heritage Bank</option>
+                    <option value="301">Jaiz Bank</option>
+                    <option value="082">Keystone Bank</option>
+                    <option value="101">Providus Bank</option>
+                    <option value="076">Polaris Bank</option>
+                    <option value="221">Stanbic IBTC Bank</option>
+                    <option value="068">Standard Chartered Bank</option>
+                    <option value="232">Sterling Bank</option>
+                    <option value="100">Suntrust Bank</option>
+                    <option value="032">Union Bank of Nigeria</option>
+                    <option value="033">United Bank for Africa (UBA)</option>
+                    <option value="215">Unity Bank</option>
+                    <option value="035">Wema Bank</option>
+                    <option value="057">Zenith Bank</option>
+                    <option value="090110">VFD Microfinance Bank</option>
+                    <option value="090267">Kuda Bank</option>
+                    <option value="100004">Opay</option>
+                    <option value="100033">Palmpay</option>
+                  </select>
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="accNum">10-Digit NUBAN Account Number</label>
+                  <input
+                    id="accNum"
+                    className="form-control"
+                    maxLength={10}
+                    placeholder="e.g. 0123456789"
+                    value={bank.accountNumber}
+                    onChange={(e) => setBank((prev) => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, '') }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary-cta" disabled={savingBank}>
+                {savingBank ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-shield-check me-1"></i>}
+                Verify &amp; Save Bank Account
+              </button>
             </form>
           </div>
         </div>
